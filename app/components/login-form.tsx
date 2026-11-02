@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { useLoginApiMutation } from "@/redux/api/web-auth/authApi";
 import { saveAccessToken } from "@/redux/auth-token";
@@ -15,6 +15,10 @@ type LoginResponse = {
   message?: string;
   data?: { accessToken?: string };
 };
+
+function getEnglishMessage(message: string | undefined, fallback: string) {
+  return message && !/[\u0980-\u09ff]/.test(message) ? message : fallback;
+}
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -41,18 +45,20 @@ export function LoginForm() {
 
       const accessToken = response.data?.accessToken;
       if (!accessToken) {
-        toast.error(response.message || "");
+        toast.error(getEnglishMessage(response.message, "We couldn't sign you in. Please try again."));
         return;
       }
 
       saveAccessToken(accessToken);
-      toast.success(response.message || "");
+      toast.success(getEnglishMessage(response.message, "Signed in successfully."));
       reset();
       router.replace("/dashboard");
     } catch (error) {
       toast.error(
-        (error as { data?: { message?: string } })?.data?.message ||
-          "",
+        getEnglishMessage(
+          (error as { data?: { message?: string } })?.data?.message,
+          "We couldn't sign you in. Check your email and password, then try again.",
+        ),
       );
     }
   }
@@ -126,7 +132,11 @@ export function LoginForm() {
           type="submit"
           disabled={isSubmitting || isLoading}
         >
-          {isLoading ? "Logging in..." : "Log in"} <ArrowRight size={17} />
+          {isLoading ? (
+            <><LoaderCircle className="auth-loading-icon" size={17} /> Logging in…</>
+          ) : (
+            <>Log in <ArrowRight size={17} /></>
+          )}
         </button>
       </form>
       <div className="auth-switch">

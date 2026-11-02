@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { ArrowRight, Eye, EyeOff } from "lucide-react";
-import { useRegisterApiMutation } from "@/redux/api/web-auth/authApi";
+import { ArrowRight, Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { useRegisterApiMutation, useSendOtpApiMutation } from "@/redux/api/web-auth/authApi";
 import toast from "react-hot-toast";
 
 type RegisterValues = {
@@ -14,13 +15,20 @@ type RegisterValues = {
   termsAccepted: boolean;
 };
 
+function getEnglishMessage(message: string | undefined, fallback: string) {
+  return message && !/[\u0980-\u09ff]/.test(message) ? message : fallback;
+}
+
 export function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
+  const [isProcessingRegistration, setIsProcessingRegistration] = useState(false);
+  const [submittingStep, setSubmittingStep] = useState<"register" | "otp">("register");
+  const router = useRouter();
   const {
     register,
     handleSubmit,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<RegisterValues>({
     mode: "onBlur",
     defaultValues: {
@@ -32,8 +40,11 @@ export function RegisterForm() {
   });
 
   const [registerApi] = useRegisterApiMutation();
+  const [sendOtpApi] = useSendOtpApiMutation();
 
   const onSubmit = async (values: RegisterValues) => {
+    setIsProcessingRegistration(true);
+    setSubmittingStep("register");
     const payload = {
       name: values.fullName,
       email: values.email,
@@ -43,12 +54,23 @@ export function RegisterForm() {
 
     try {
       const res = await registerApi(payload).unwrap();
-      // console.log("res---- 33-->", res);
-      toast.success(res?.message);
+      toast.success(getEnglishMessage(res?.message, "Account created successfully."));
       reset();
+      setSubmittingStep("otp");
+      try {
+        await sendOtpApi({ email: payload.email }).unwrap();
+        toast.success("A verification code has been sent to your email.");
+      } catch {
+        toast.error("We couldn't send the code. Use Resend OTP on the verification page.");
+      }
+      router.push(`/verify-otp?email=${encodeURIComponent(payload.email)}`);
     } catch (error) {
+      setIsProcessingRegistration(false);
       toast.error(
-        (error as { data?: { message?: string } })?.data?.message || ""
+        getEnglishMessage(
+          (error as { data?: { message?: string } })?.data?.message,
+          "We couldn't create your account. Please check your details and try again.",
+        ),
       );
     }
   };
@@ -57,7 +79,18 @@ export function RegisterForm() {
 
 
   return (
-    <>
+    <div className="register-form-content">
+      {isProcessingRegistration && (
+        <div className="register-loading-overlay" role="status" aria-live="polite">
+          <LoaderCircle className="register-loading-spinner" size={38} />
+          <strong>
+            {submittingStep === "register"
+              ? "Creating your account…"
+              : "Sending your verification code…"}
+          </strong>
+          <span>Please wait while we prepare email verification.</span>
+        </div>
+      )}
       <span className="eyebrow auth-eyebrow">CREATE YOUR FREE ACCOUNT</span>
       <h1>Create your account</h1>
       <p className="auth-intro">
@@ -177,9 +210,16 @@ export function RegisterForm() {
         <button
           className="button button-primary auth-submit"
           type="submit"
-          disabled={isSubmitting}
+          disabled={isProcessingRegistration}
         >
-          Create account <ArrowRight size={17} />
+          {isProcessingRegistration ? (
+            <>
+              <LoaderCircle className="auth-loading-icon" size={17} />
+              {submittingStep === "register" ? "Creating account…" : "Sending OTP…"}
+            </>
+          ) : (
+            <>Create account <ArrowRight size={17} /></>
+          )}
         </button>
       </form>
       <div className="auth-switch">
@@ -189,6 +229,6 @@ export function RegisterForm() {
         By continuing, you agree to our <Link href="/login">Terms</Link> and{" "}
         <Link href="/login">Privacy Policy</Link>.
       </p>
-    </>
+    </div>
   );
 }

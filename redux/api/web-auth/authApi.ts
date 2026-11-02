@@ -10,6 +10,22 @@ const authApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["web-auth"],
     }),
+    sendOtpApi: builder.mutation({
+      query: (otpInfo) => ({
+        url: `/api/v1/otp/send`,
+        method: "POST",
+        body: otpInfo,
+      }),
+      invalidatesTags: ["web-auth"],
+    }),
+    verifyOtpApi: builder.mutation({
+      query: (otpInfo) => ({
+        url: `/api/v1/otp/verify`,
+        method: "POST",
+        body: otpInfo,
+      }),
+      invalidatesTags: ["web-auth"],
+    }),
     loginApi: builder.mutation({
       query: (loginInfo) => ({
         url: `/api/v1/auth/login`,
@@ -48,6 +64,8 @@ const authApi = baseApi.injectEndpoints({
 
 export const {
   useRegisterApiMutation,
+  useSendOtpApiMutation,
+  useVerifyOtpApiMutation,
   useLoginApiMutation,
   useForgotPasswordApiMutation,
   useResetPasswordApiMutation,
